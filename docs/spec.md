@@ -1,6 +1,6 @@
 # Account health scoring
 
-**Status:** Draft
+**Status:** Approved
 
 ## What this does
 
@@ -26,7 +26,8 @@ account_id,month,seats_active,logins,tickets_open
 | `tickets_open` | Support tickets still open at the end of the month |
 
 The first line is the header shown above. `account_id`, `month`, `logins` and
-`tickets_open` are always present and never blank. Rows may appear in any order, and each account has at most one row per
+`tickets_open` are always present and never blank. `seats_active` may be blank,
+in which case it is parsed as `0`. Rows may appear in any order, and each account has at most one row per
 month.
 
 ## The two halves
@@ -84,8 +85,9 @@ is floored at 0. It never goes negative.
 rules appear in the table above. An account with no rules fired has an empty
 `reasons` list.
 
-The seat-decline rule needs at least two months to compare. An account with only
-one month in the export does not fire it, and cannot lose those 4 points.
+The seat-decline rule needs at least two months to compare: it compares the
+latest month's seat count against the immediately preceding month. An account
+with only one month in the export does not fire it, and cannot lose those 4 points.
 
 ## Tiers
 
@@ -94,9 +96,6 @@ one month in the export does not fire it, and cannot lose those 4 points.
 | `HEALTHY` | 8–10 |
 | `MEDIUM` | 5–7 |
 | `AT RISK` | 0–4 |
-
-Any account scoring 5 or below should be surfaced to CS as at risk, so the
-weekly digest is built from that set.
 
 ## Out of scope
 
@@ -107,6 +106,9 @@ produces the score and nothing else.
 
 | ID | Rule a builder follows | Passage it resolves | Case that would differ |
 | --- | --- | --- | --- |
+| D1 | The seat decline rule compares the latest month's seat count to the immediately preceding month. | "The latest month's seat count has fallen by 40% or more" | `vandelay` in `fixtures/usage.csv` (10 seats in 2026-01, 6 in 2026-02, 5 in 2026-03) has a 16.7% drop from 6 to 5, so the rule does not fire. |
+| D2 | An account scoring 5 belongs to the `MEDIUM` tier. `AT RISK` is 0–4, `MEDIUM` is 5–7, and `HEALTHY` is 8–10. | "Any account scoring 5 or below should be surfaced to CS as at risk" | `initech` in `fixtures/usage.csv` (score 5) is placed in `MEDIUM`. |
+| D3 | A blank `seats_active` value in the CSV is parsed as 0. | "`account_id`, `month`, `logins` and `tickets_open` are always present and never blank" | `acme` in `fixtures/usage.csv` (`acme,2026-03,,5,0`) has `seats_active=0`, resulting in a 100% decline from `2026-02` (8 seats) and a score of 6. |
 
 ## Open questions
 
